@@ -1,10 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "main.h"
 
 char *cmd = "AT+CIPSTART=\"TCP\",\"www.google.com\",80\n";
 
-char *resp1 = "OK +CIPRCV:32,AXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXZ+CIPRCV:25,BYYYYYYYYYYYYYYYYYYYYYYYZ+CIPRCV:58";
+char *resp1 = "OK +CIPRCV:32,AXXXXXXXXXXXXXXX,,XXXCIPRCV,XXXZ+CIPRCV:25,BYYYYYYYYYCIPRCVYYYYYYYYZ+CIPRCV:58,hello";
 
 char *header;
 char *payload;
@@ -27,11 +25,32 @@ int footer_end_index;
 char *payload_size;
 int payload_size_num;
 
+int header_start_indexes[3];
+int payload_start_indexes[3];
+
+char clean_buff[128];
+
 static void filter_payload(char *frame);
+static void test_func(char *frame);
+static void find_headers(char *frame);
+static void find_payloads(char *frame);
 
 int main ()
 {
-  filter_payload(resp1);
+  printf("data = %s\n", resp1);
+  find_headers(resp1);
+  find_payloads(resp1);
+  int next = 0;
+  for (int i = 0; i < 3; i++)
+  {
+    memcpy(clean_buff+next, 
+           resp1+payload_start_indexes[i], 
+           header_start_indexes[i+1] - payload_start_indexes[i]
+    );
+    next = header_start_indexes[i+1] - payload_start_indexes[i];
+    printf("clean_buff = %s\n", clean_buff);
+  }
+
   return(0);
 }
 
@@ -44,7 +63,18 @@ void filter_payload(char *frame)
   {
     if (frame[i] == ',')
     {
-      header_end_index = i+1;
+      header_end_index = i + 1;
+      printf("header_end_index = %d\n", header_end_index);
+      // if(memcmp((frame + i) - 12, "+CIPRCV:", 8))
+      // {
+      //   printf("%s\n", (frame + i) - 12);
+      //   printf("MATCH\n");
+      // }
+      // else
+      // {
+      //   printf("%s\n", (frame + i) - 12);
+      //   printf("NO MATCH\n");
+      // }
       break;
     }
   }
@@ -75,4 +105,77 @@ void filter_payload(char *frame)
   memcpy(payload, frame + header_end_index, payload_size_num);
   printf("payload = %s\n", payload);
   printf("===================================================================================\n");
+  printf("===================================================================================\n");
+}
+
+void test_func(char *frame)
+{
+  // find payload index
+  char *ret;
+  char tmp[12];
+  int i;
+  for (i = 0; i < strlen(frame); i++)
+  {
+    if (frame[i] == ',')
+    {
+      ret = strstr(frame, "+CIPRCV:");
+      printf("header = %s\n", ret);
+      memcpy(tmp, ret, 12);
+      printf("tmp = %s\n", tmp);
+      if (strstr(tmp, "+CIPRCV:"))
+      {
+        payload_start_index = i+1;
+        printf("payload_start_index = %d\n", payload_start_index);
+        break;
+      }
+    }
+  }
+}
+
+void find_headers(char *frame)
+{
+  int i = 0;
+  int pos = 0;
+  int count = 0;
+  while(frame = strstr(frame, "+CIPRCV:"))
+  {
+    // printf("pointer = %s\n", frame);
+    // use pointer subtraction to pass from pointer to index
+    pos = frame - resp1;
+    // printf("header position = %d\n", pos);
+    header_start_indexes[i] = pos;
+    i++;
+    count++;
+    frame++;
+  }
+  printf("found %d header/payload @ indexes: ", count);
+  for (int j = 0; j < count; j++)
+  {
+    printf("%d ", header_start_indexes[j]);
+  }
+  printf("\n");
+}
+
+void find_payloads(char *frame)
+{
+  int x = 0;
+  int i = 0;
+  foreach(int *header_pos, header_start_indexes)
+  {
+    for (x = *header_pos; x < *header_pos+14; x++)
+    {
+      if (resp1[x] == ',')
+      {
+        printf("found payload start @ position %d\n", x+1);
+        payload_start_indexes[i] = x+1;
+        i++;
+        break;
+      }
+    }
+  }
+}
+
+void load_payloads(char *frame, char *clean_payload)
+{
+
 }
